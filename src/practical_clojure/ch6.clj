@@ -141,5 +141,46 @@
 (await an-agent)
 (await-for 1000 an-agent)
 
-;; At the end of the program we shutdown all agents:
+;; At the end of the program (JVM going down) we shutdown all agents:
 (shutdown-agents)
+
+;;; Vars and local state. Clojure 1.4 requires ^:dynamic to declare a
+;;; variable as dynamic. Only dynamic variables are allowed in the
+;;; list of bindings
+(def ^:dynamic x 5)
+(def ^:dynamic y 9)
+(defn zoo [] (+ x y))
+(zoo)
+(binding [x 12 y 900] (+ x y))
+
+;;; Validators.
+
+;; With a validator you place a guard on how the state of an identity
+;; can be modified. It is a guarantee of commited values.
+(def my-ref (ref 5))
+(set-validator! my-ref (fn [x] (> x 0)))
+(dosync (alter my-ref - 10)) 
+(dosync (alter my-ref - 10) (alter my-ref + 15)) ;
+
+;; You can also set a validator on an agent
+(def my-agent (agent 5))
+@my-agent
+(set-validator! my-agent (fn [x] (> x 0)))
+(set-validator! my-agent nil)
+(send my-agent - 10)
+
+;; And also atoms
+(def my-atom (atom 5))
+(set-validator! my-atom (fn [x] (< 0 x)))
+(swap! my-atom - 4)
+
+;; You can retrieve the validator
+(get-validator my-atom)
+
+;;; Watches
+
+;; You can watch an identity and see that it gets changed.
+(defn my-watch [key identity old new]
+  (println "Old: " old ", New: " new))
+(add-watch my-agent "w1" my-watch)
+(remove-watch my-agent "w1")
